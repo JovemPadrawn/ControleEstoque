@@ -1,14 +1,21 @@
-create database controle_estoque;
-use controle_estoque;
+USE controle_estoque;
+DROP TABLE IF EXISTS produto;
+DROP TABLE IF EXISTS categoria;
 
-create table produto(
-	id int primary key auto_increment,
-    nome varchar(100) not null,
-    quantidade int not null,
-    preco decimal (5,2) not null
+CREATE TABLE categoria (
+    id_categoria INT PRIMARY KEY AUTO_INCREMENT,
+    nome_categoria VARCHAR(100) NOT NULL
 );
 
-insert into produto (nome, quantidade, preco) 
-value ("Mouse", 2, 25.78);
+CREATE TABLE produto (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(100) NOT NULL,
+    quantidade INT NOT NULL,
+    preco DECIMAL(10, 2) NOT NULL,
+    id_categoria INT NOT NULL,
+    FOREIGN KEY (id_categoria) REFERENCES categoria(id_categoria)
+);
 
-select * from produto;
+INSERT INTO categoria (nome_categoria) VALUES ('Geral');
+
+SELECT * FROM categoria;

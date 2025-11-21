@@ -5,8 +5,6 @@ import Modelo.Produto;
 
 import javax.swing.table.DefaultTableModel;
 import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.util.List;
 
 public class FormGerenciadorEstoque extends JFrame {
@@ -25,240 +23,168 @@ public class FormGerenciadorEstoque extends JFrame {
     private JComboBox<Categoria> comboCategoria;
 
     ProdutoDAO produtoDao = new ProdutoDAO();
-    static int id;
+    static int idProdutoSelecionado;
 
-    //CRIAMOS UM ARRAY DE STRING PARA O RÓTULO DA TABELA
     String[] colunas = {"ID", "PRODUTO", "CATEGORIA", "QUANTIDADE", "PREÇO", "TOTAL (R$)"};
-
-    //INSERIRINDO O RÓTULO NA LINHA 0 DO OBJETO model
     DefaultTableModel model = new DefaultTableModel(colunas, 0);
 
     public FormGerenciadorEstoque(){
         setContentPane(Principal);
         table1.setModel(model);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(500, 600);
+        setSize(600, 600);
         setTitle("Gerenciador de Estoque");
         setLocationRelativeTo(null);
-        setVisible(true);
 
         habilitarCampos(false);
-        adicionarButton.setEnabled(true);
-        editarButton.setEnabled(true);
         listarProdutos();
-        carregarCategorias(); // ✅ carrega as categorias aqui
-        limparCampos();
 
-        adicionarButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
+        // Ações dos Botões
+        categoriasButton.addActionListener(e -> {
+            FormGerenciadorCategoria formCat = new FormGerenciadorCategoria();
+            formCat.setVisible(true);
+            // Ao fechar a janela de categorias, recarrega o combo (truque simples)
+            formCat.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override
+                public void windowClosed(java.awt.event.WindowEvent windowEvent) {
+                    carregarCategorias();
+                }
+            });
+        });
+
+        adicionarButton.addActionListener(e -> {
+            carregarCategorias();
+            if(comboCategoria.getItemCount() == 0) {
+                JOptionPane.showMessageDialog(null, "Cadastre uma Categoria primeiro!");
+                return;
+            }
+            habilitarCampos(true);
+            salvarAtualizarButton.setText("Salvar");
+            TF_nome.requestFocus();
+        });
+
+        salvarAtualizarButton.addActionListener(e -> {
+            salvarProduto();
+        });
+
+        editarButton.addActionListener(e -> {
+            int linha = table1.getSelectedRow();
+            if (linha != -1) {
+                carregarCategorias();
                 habilitarCampos(true);
-                adicionarButton.setEnabled(false);
-                editarButton.setEnabled(false);
-            }
-        });
-        salvarAtualizarButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String nome = TF_nome.getText().trim();
+                salvarAtualizarButton.setText("Atualizar");
 
-                if(nome.isEmpty()){
-                    JOptionPane.showMessageDialog(null,
-                            "O nome do Produto não pode ser vazio", "Erro", JOptionPane.ERROR_MESSAGE);
-                    TF_nome.requestFocus();
-                    return;
-                }
-                int quantidade = 0;
-                double preco = 0.0;
+                // Preencher dados
+                idProdutoSelecionado = Integer.parseInt(table1.getValueAt(linha, 0).toString());
+                TF_nome.setText(table1.getValueAt(linha, 1).toString());
 
-                try {
-                    quantidade = Integer.parseInt(TF_quantidade.getText().trim());
-                    if(quantidade < 0){
-                        JOptionPane.showMessageDialog(null,
-                                "A quantidade do produto não pode ser negativo.",
-                                "Erro", JOptionPane.ERROR_MESSAGE);
-                        TF_quantidade.requestFocus();
-                        return;
+                // Selecionar a categoria correta no Combo
+                String nomeCatTabela = table1.getValueAt(linha, 2).toString();
+                for (int i = 0; i < comboCategoria.getItemCount(); i++) {
+                    if (comboCategoria.getItemAt(i).getNome_categoria().equals(nomeCatTabela)) {
+                        comboCategoria.setSelectedIndex(i);
+                        break;
                     }
-
-                    preco = Double.parseDouble(TF_preco.getText().trim());
-                    if(preco < 0){
-                        JOptionPane.showMessageDialog(null,
-                                "O preço do produto não pode ser negativo",
-                                "Erro", JOptionPane.ERROR_MESSAGE);
-                        TF_preco.requestFocus();
-                        return;
-                    }
-                } catch (NumberFormatException ex) {
-                    JOptionPane.showMessageDialog(null, "Por favor, insira valores numéricos válidos para quantidade e preço.", "Erro de entrada", JOptionPane.ERROR_MESSAGE);
-                    return;
                 }
 
-                //Produto produto = new Produto(nome, quantidade, preco, id_categoria);
-                Categoria categoriaSelecionada = (Categoria) comboCategoria.getSelectedItem();
+                TF_quantidade.setText(table1.getValueAt(linha, 3).toString());
+                TF_preco.setText(table1.getValueAt(linha, 4).toString());
+            } else {
+                JOptionPane.showMessageDialog(null, "Selecione um produto para editar.");
+            }
+        });
 
-                Produto produto = new Produto();
-                produto.setNome(TF_nome.getText());
-                produto.setPreco(Double.parseDouble(TF_preco.getText()));
-                produto.setQuantidade(Integer.parseInt(TF_quantidade.getText()));
-                produto.setCategoria(categoriaSelecionada); //
+        cancelarButton.addActionListener(e -> habilitarCampos(false));
 
-                if(salvarAtualizarButton.getText().equals("Salvar")) {
-                    //Salvar
-                    if (produtoDao.inserir(produto)) {
-                        JOptionPane.showMessageDialog(null,
-                                "Produto Inserido com Sucesso!!!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(null,
-                                "Erro ao inserir o produto no Banco de Dados", "Erro", JOptionPane.ERROR_MESSAGE);
-                    }
-                }else{
-                    //atualizar
-                    produto.setId_produto(id);
-                    if (produtoDao.atualizar(produto)) {
-                        JOptionPane.showMessageDialog(null,
-                                "Produto Atualizado com Sucesso!!!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(null,
-                                "Erro ao atualizar o produto no Banco de Dados", "Erro", JOptionPane.ERROR_MESSAGE);
-                    }
-                    salvarAtualizarButton.setText("Salvar");
+        excluirButton.addActionListener(e -> {
+            int linha = table1.getSelectedRow();
+            if (linha != -1) {
+                int id = Integer.parseInt(table1.getValueAt(linha, 0).toString());
+                if(JOptionPane.showConfirmDialog(null, "Excluir produto?", "Confirmação", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION){
+                    produtoDao.excluir(id);
+                    listarProdutos();
                 }
-                limparCampos();
-                habilitarCampos(false);
-                editarButton.setEnabled(true);
-                adicionarButton.setEnabled(true);
-                listarProdutos();
+            } else {
+                JOptionPane.showMessageDialog(null, "Selecione um produto para excluir.");
             }
         });
-        cancelarButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                limparCampos();
-                habilitarCampos(false);
-                adicionarButton.setEnabled(true);
-                salvarAtualizarButton.setText("Salvar");
-                cancelarButton.setEnabled(false);
-                excluirButton.setEnabled(false);
-                table1.clearSelection();
+    }
 
-                //editarButton.setEnabled(false);
+    private void salvarProduto() {
+        try {
+            String nome = TF_nome.getText().trim();
+            int qtd = Integer.parseInt(TF_quantidade.getText().trim());
+            double preco = Double.parseDouble(TF_preco.getText().trim().replace(",", "."));
+            Categoria cat = (Categoria) comboCategoria.getSelectedItem();
+
+            if (nome.isEmpty() || cat == null) {
+                JOptionPane.showMessageDialog(null, "Preencha todos os campos.");
+                return;
             }
-        });
-        editarButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int linhaSelecionada = table1.getSelectedRow();
 
-                excluirButton.setEnabled(true);
+            Produto p = new Produto(nome, qtd, preco, cat);
 
-                if (linhaSelecionada != -1) {
-                    TF_nome.setText(table1.getValueAt(linhaSelecionada, 1).toString());
-                    TF_quantidade.setText(table1.getValueAt(linhaSelecionada, 3).toString());
-                    TF_preco.setText(table1.getValueAt(linhaSelecionada, 4).toString());
-                    habilitarCampos(true);
-                    id = Integer.parseInt(table1.getValueAt(linhaSelecionada, 0).toString());
-
-                    String nomeCategoria = table1.getValueAt(linhaSelecionada, 2).toString();
-                    for (int i = 0; i < comboCategoria.getItemCount(); i++) {
-                        Categoria cat = (Categoria) comboCategoria.getItemAt(i);
-                        if (cat.getNome_categoria().equals(nomeCategoria)) {
-                            comboCategoria.setSelectedIndex(i);
-                            break;
-                        }
-                    }
-                    salvarAtualizarButton.setText("Atualizar");
-                    adicionarButton.setEnabled(false);
-                } else {
-                    JOptionPane.showMessageDialog(null,
-                            "É necessário marcar uma linha para edição", "Erro", JOptionPane.ERROR_MESSAGE);
-                }
+            if (salvarAtualizarButton.getText().equals("Salvar")) {
+                if(produtoDao.inserir(p)) JOptionPane.showMessageDialog(null, "Produto salvo!");
+            } else {
+                p.setId_produto(idProdutoSelecionado);
+                if(produtoDao.atualizar(p)) JOptionPane.showMessageDialog(null, "Produto atualizado!");
             }
-        });
 
-        excluirButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                int resposta = JOptionPane.showConfirmDialog(
-                        null,
-                        "Realmente você deseja excluir? Não há retorno!!!",
-                        "Confirmação para excluir o produto",
-                        JOptionPane.YES_NO_OPTION
-                );
-                if (resposta == JOptionPane.YES_OPTION) {
-                    if (produtoDao.excluir(id)) {
-                        JOptionPane.showMessageDialog(null,
-                                "Produto excluido com Sucesso!!!", "Sucesso", JOptionPane.INFORMATION_MESSAGE);
-                    } else {
-                        JOptionPane.showMessageDialog(null,
-                                "Erro ao excluir o produto no Banco de Dados", "Erro", JOptionPane.ERROR_MESSAGE);
-                    }
-                } else {
-                    JOptionPane.showMessageDialog(null, "Você cancelou a operação.");
-                }
-                listarProdutos();
-                cancelarButton.setEnabled(false);
-                salvarAtualizarButton.setText("Salvar");
-                salvarAtualizarButton.setEnabled(false);
-                adicionarButton.setEnabled(true);
-                excluirButton.setEnabled(false);
-                habilitarCampos(false);
-                limparCampos();
-            }
-        });
-        categoriasButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                FormGerenciadorCategoria formGerenciadorCategoria = new FormGerenciadorCategoria();
-                formGerenciadorCategoria.setVisible(true);
+            habilitarCampos(false);
+            listarProdutos();
 
-            }
-        });
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(null, "Valores numéricos inválidos.");
+        }
     }
 
     public void habilitarCampos(Boolean status){
         TF_nome.setEnabled(status);
         TF_quantidade.setEnabled(status);
         TF_preco.setEnabled(status);
+        comboCategoria.setEnabled(status);
+
         salvarAtualizarButton.setEnabled(status);
         cancelarButton.setEnabled(status);
-        carregarCategorias();
 
-        editarButton.setEnabled(status);
-        adicionarButton.setEnabled(status);
-        excluirButton.setEnabled(status);
-        salvarAtualizarButton.setEnabled(status);
+        adicionarButton.setEnabled(!status);
+        editarButton.setEnabled(!status);
+        excluirButton.setEnabled(!status);
+
+        if(!status) limparCampos();
     }
+
     public void limparCampos(){
         TF_nome.setText("");
         TF_quantidade.setText("");
         TF_preco.setText("");
     }
+
     public void listarProdutos(){
         model.setRowCount(0);
-        double total = 0;
-        for(Produto l : produtoDao.listarTodos()){
-            Object[] linha = {
-                    l.getId_produto(),
-                    l.getNome(),
-                    l.getCategoria().getNome_categoria(),
-                    l.getQuantidade(),
-                    l.getPreco(),
-                    l.getQuantidade() * l.getPreco()
-            };
-            total = total + (l.getPreco()*l.getQuantidade());
-            model.addRow(linha);
+        double totalGeral = 0;
+        for(Produto p : produtoDao.listarTodos()){
+            double totalItem = p.getQuantidade() * p.getPreco();
+            model.addRow(new Object[]{
+                    p.getId_produto(),
+                    p.getNome(),
+                    p.getCategoria().getNome_categoria(),
+                    p.getQuantidade(),
+                    p.getPreco(),
+                    totalItem
+            });
+            totalGeral += totalItem;
         }
-        TF_Total.setText(String.valueOf(total));
+        TF_Total.setText(String.format("%.2f", totalGeral));
     }
-    private void carregarCategorias() {
-        CategoriaDAO categoriaDAO = new CategoriaDAO();
-        List<Categoria> lista = categoriaDAO.listarTodos();
 
-        comboCategoria.removeAllItems(); // limpa antes
+    private void carregarCategorias() {
+        CategoriaDAO dao = new CategoriaDAO();
+        List<Categoria> lista = dao.listarTodos();
+        comboCategoria.removeAllItems();
         for (Categoria c : lista) {
             comboCategoria.addItem(c);
         }
     }
-
 }
